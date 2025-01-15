@@ -2,16 +2,51 @@ import React, { useState } from 'react';
 import './App.css';
 
 function App() {
+  const [gameMode, setGameMode] = useState(null); // Оюн режими: null, 'friend', 'computer'
   const [history, setHistory] = useState([Array(9).fill(null)]);
   const [currentMove, setCurrentMove] = useState(0);
+  const [winner, setWinner] = useState(null); // Жеңүүчүнү сактоо
+  const [isDraw, setIsDraw] = useState(false); // Тең чыгуу абалы
   const xIsNext = currentMove % 2 === 0;
   const currentSquares = history[currentMove];
+
+  // Башкы меню экраны
+  function MainMenu({ onSelectMode }) {
+    return (
+      <div className="main-menu">
+        <h1>Тик-Так-Тоо</h1>
+        <button onClick={() => onSelectMode('friend')}>Досуң менен ойноо</button>
+        <button onClick={() => onSelectMode('computer')}>Компьютер менен ойноо</button>
+      </div>
+    );
+  }
+
+  // Компьютердин жүрүшү
+  function computerMove(squares) {
+    const emptySquares = squares.map((square, index) => (square === null ? index : null)).filter((index) => index !== null);
+    const randomIndex = Math.floor(Math.random() * emptySquares.length);
+    return emptySquares[randomIndex];
+  }
 
   // Квадрат басылганда
   function handlePlay(nextSquares) {
     const nextHistory = [...history.slice(0, currentMove + 1), nextSquares];
     setHistory(nextHistory);
     setCurrentMove(nextHistory.length - 1);
+
+    const gameWinner = calculateWinner(nextSquares);
+    if (gameWinner) {
+      setWinner(gameWinner); // Жеңүүчүнү белгилөө
+    } else if (!nextSquares.includes(null)) {
+      setIsDraw(true); // Оюн тең чыкты
+    }
+
+    // Компьютер менен оюнда анын жүрүшү
+    if (gameMode === 'computer' && !gameWinner && nextSquares.includes(null)) {
+      const computerMoveIndex = computerMove(nextSquares);
+      nextSquares[computerMoveIndex] = 'O';
+      handlePlay(nextSquares);
+    }
   }
 
   // Жеңүүчүнү эсептөө
@@ -35,6 +70,20 @@ function App() {
     return null;
   }
 
+  // Модалдык терезе компоненти
+  function Modal({ winner, isDraw, onClose, onRestart, onBackToMenu }) {
+    return (
+      <div className="modal">
+        <div className="modal-content">
+          {winner && <h2>Жеңүүчү: {winner}</h2>}
+          {isDraw && <h2>Оюн тең чыкты!</h2>}
+          <button onClick={onRestart}>Кайра ойноо</button>
+          <button onClick={onBackToMenu}>Башкы бетке өтүү</button>
+        </div>
+      </div>
+    );
+  }
+
   // Квадрат компоненти
   function Square({ value, onSquareClick }) {
     return (
@@ -45,7 +94,7 @@ function App() {
   }
 
   // Борд компоненти
-  function Board({ xIsNext, squares, onPlay }) {
+  function Board({ xIsNext, squares, onPlay, onBackToMenu }) {
     function handleClick(i) {
       if (calculateWinner(squares) || squares[i]) {
         return;
@@ -59,16 +108,20 @@ function App() {
       onPlay(nextSquares);
     }
 
-    const winner = calculateWinner(squares);
     let status;
     if (winner) {
-      status = 'Winner: ' + winner;
+      status = 'Жеңүүчү: ' + winner;
+    } else if (isDraw) {
+      status = 'Оюн тең чыкты!';
     } else {
-      status = 'Next player: ' + (xIsNext ? 'X' : 'O');
+      status = 'Кийинки оюнчу: ' + (xIsNext ? 'X' : 'O');
     }
 
     return (
       <>
+        <div className="back-to-menu">
+          <button onClick={onBackToMenu}>Башкы бетке өтүү</button>
+        </div>
         <div className="status">{status}</div>
         <div className="board-row">
           <Square value={squares[0]} onSquareClick={() => handleClick(0)} />
@@ -89,11 +142,55 @@ function App() {
     );
   }
 
+  // Модал жабылганда
+  function handleModalClose() {
+    setGameMode(null);
+    setHistory([Array(9).fill(null)]);
+    setCurrentMove(0);
+    setWinner(null);
+    setIsDraw(false);
+  }
+
+  // Кайра оюн баштоо
+  function handleRestart() {
+    setHistory([Array(9).fill(null)]);
+    setCurrentMove(0);
+    setWinner(null);
+    setIsDraw(false);
+  }
+
+  // Башкы бетке өтүү
+  function handleBackToMenu() {
+    setGameMode(null);
+    setHistory([Array(9).fill(null)]);
+    setCurrentMove(0);
+    setWinner(null);
+    setIsDraw(false);
+  }
+
   return (
     <div className="game">
-      <div className="game-board">
-        <Board xIsNext={xIsNext} squares={currentSquares} onPlay={handlePlay} />
-      </div>
+      {!gameMode ? (
+        <MainMenu onSelectMode={setGameMode} />
+      ) : (
+        <div className="game-board">
+          <Board
+            xIsNext={xIsNext}
+            squares={currentSquares}
+            onPlay={handlePlay}
+            onBackToMenu={handleBackToMenu} // Артка кайтуу функциясын өткөрүп беребиз
+          />
+        </div>
+      )}
+      {(winner || isDraw) && (
+        <Modal
+          winner={winner}
+          isDraw={isDraw}
+          onClose={handleModalClose}
+          onRestart={handleRestart}
+          onBackToMenu={handleBackToMenu}
+        />
+      )}
     </div>
   );
 }
